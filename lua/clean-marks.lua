@@ -2,20 +2,9 @@ local M = {}
 
 local S = {}
 
-local function get_wd()
-	local arg = vim.fn.argv(0)
-	if arg ~= "" and vim.fn.isdirectory(arg) == 1 then
-		return vim.fn.getcwd() .. "/" .. arg
-	end
-	return vim.fn.getcwd()
-end
-
 local function get_fn()
-	local path = get_wd() .. "/clean-marks.json"
-	local name = path:gsub("[/]", "-")
-	if name:sub(1, 1) == "-" then
-		name = name:sub(2)
-	end
+	local path = vim.fn.getcwd() .. ".json"
+	local name = path:gsub("^/", ""):gsub("/+", "-")
 	return name
 end
 
@@ -42,9 +31,9 @@ local function log(msg)
 end
 
 local function load_state()
-	log("loading state")
-	vim.fn.mkdir(OPTS.datadir, "p")
-	local ok, fd = pcall(io.open, OPTS.datadir .. "/" .. OPTS.filename)
+	local statepath = OPTS.datadir .. "/" .. OPTS.filename
+	log("loading state from " .. statepath)
+	local ok, fd = pcall(io.open, statepath)
 	if not ok or fd == nil then
 		log("failed to open the data file for reading")
 		return
@@ -173,6 +162,7 @@ local function init_mappings()
 end
 
 M.setup = function(opts)
+	vim.fn.mkdir(OPTS.datadir, "p")
 	OPTS = vim.tbl_extend("force", OPTS, opts)
 	init_mappings()
 	load_state()

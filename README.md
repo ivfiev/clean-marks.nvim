@@ -26,6 +26,7 @@ Some examples:
 ```lua
 {
   "ivfiev/clean-marks.nvim",
+  event = "VeryLazy",
   opts = {
     max_length = 4,
     mappings = {
