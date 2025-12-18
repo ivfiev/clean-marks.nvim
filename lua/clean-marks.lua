@@ -2,6 +2,8 @@ local M = {}
 
 local S = {}
 
+local level = vim.log.levels
+
 local function get_fn()
 	local path = vim.fn.getcwd() .. ".json"
 	local name = path:gsub("^/", ""):gsub("/+", "-")
@@ -12,7 +14,7 @@ local OPTS = {
 	max_length = 4,
 	filename = get_fn(),
 	datadir = vim.fn.stdpath("data") .. "/clean-marks",
-	logging_enabled = false,
+	log_level = vim.log.levels.OFF,
 	mappings = {
 		set_mark = "<leader>m",
 		goto_mark = "<leader>'",
@@ -24,9 +26,10 @@ local OPTS = {
 	},
 }
 
-local function log(msg)
-	if OPTS.logging_enabled then
-		vim.notify(string.format("clean-marks.nvim: %s", msg), vim.log.levels.DEBUG)
+local function log(msg, lvl)
+	lvl = lvl or level.DEBUG
+	if OPTS.log_level <= lvl then
+		vim.notify(string.format("clean-marks.nvim: %s", msg), lvl)
 	end
 end
 
@@ -35,7 +38,7 @@ local function load_state()
 	log("loading state from " .. statepath)
 	local ok, fd = pcall(io.open, statepath)
 	if not ok or fd == nil then
-		log("failed to open the data file for reading")
+		log("failed to open the data file for reading", level.ERROR)
 		return
 	end
 	local content = fd:read("*a")
@@ -47,7 +50,7 @@ local function write_state()
 	log("writing state")
 	local ok, fd = pcall(io.open, OPTS.datadir .. "/" .. OPTS.filename, "w")
 	if not ok or fd == nil then
-		log("failed to open the data file for writing")
+		log("failed to open the data file for writing", level.ERROR)
 		return
 	end
 	local content = vim.fn.json_encode(S)
@@ -55,7 +58,7 @@ local function write_state()
 	if ok and vim.v.shell_error == 0 then
 		fd:write(table.concat(pretty, "\n"))
 	else
-		log("failed to 'jq' the json, is the binary missing?")
+		log("failed to 'jq' the json, is the binary missing?", level.WARN)
 		fd:write(content)
 	end
 	fd:close()
@@ -96,13 +99,13 @@ local function goto_mark()
 	end
 	local path = S[mark]
 	if path == nil then
-		log("mark was not set")
+		log(string.format("mark [%s] does not exist", mark), level.WARN)
 		return
 	end
 	local restore_cursor = function()
 		local ok, _ = pcall(vim.cmd, [[norm! `"]])
 		if not ok then
-			log("could not restore cursor position. try a larger shada?")
+			log("could not restore cursor position. try a larger shada?", level.WARN)
 		end
 	end
 	local bufs = vim.api.nvim_list_bufs()
@@ -119,7 +122,7 @@ local function goto_mark()
 		vim.cmd("edit " .. vim.fn.fnameescape(path))
 		restore_cursor()
 	else
-		log(string.format("file [%s] does not exist", path))
+		log(string.format("file [%s] does not exist", path), level.WARN)
 	end
 end
 
@@ -139,7 +142,12 @@ local function float_window()
 		width = width,
 		height = height,
 	})
+	vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
+	vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
+	vim.api.nvim_set_option_value("buflisted", false, { buf = buf })
+	vim.keymap.set("n", "q", ":q!<Cr>", { silent = true, buffer = buf, nowait = true })
 	vim.api.nvim_create_autocmd("BufWritePost", {
+		group = vim.api.nvim_create_augroup("CleanMarksSaveState_" .. buf, { clear = true }),
 		buffer = buf,
 		callback = function()
 			load_state()
