@@ -38,7 +38,7 @@ local function load_state()
 	log("loading state from " .. statepath)
 	local ok, fd = pcall(io.open, statepath)
 	if not ok or fd == nil then
-		log("failed to open the data file for reading", level.ERROR)
+		log("failed to open the data file for reading")
 		return
 	end
 	local content = fd:read("*a")
